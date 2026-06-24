@@ -86,14 +86,15 @@ def serve(host: Optional[str] = typer.Option(None, help="bind host (default 127.
           port: Optional[int] = typer.Option(None, help="bind port (default 8799)"),
           profile: Optional[str] = typer.Option(None),
           no_auth: bool = typer.Option(False, "--no-auth", help="disable Bearer key check"),
-          rotate_key: bool = typer.Option(False, "--rotate-key", help="generate a fresh API key")):
+          rotate_key: bool = typer.Option(False, "--rotate-key", help="generate a fresh API key"),
+          print_key: bool = typer.Option(False, "--print-key", help="print the API key and exit")):
     """Run the OpenAI-compatible HTTP endpoint in the foreground.
 
     Point any OpenAI client at the printed base_url. Other programs then use your
     Claude subscription as a drop-in OpenAI backend.
     """
     import uvicorn
-    from .server.openai_api import OpenAIServer
+    from .server.openai_api import OpenAIServer, ensure_openai_key
 
     pm = ProfileManager()
     name = profile or pm.active_name()
@@ -109,15 +110,19 @@ def serve(host: Optional[str] = typer.Option(None, help="bind host (default 127.
         config.openai_server.port = port
     if no_auth:
         config.openai_server.require_auth = False
+
+    if rotate_key:
+        key = "sk-artemis-" + _secrets.token_urlsafe(24)
+        set_secret("openai_api_key", key, name)
+    else:
+        key = ensure_openai_key(name) if config.openai_server.require_auth else None
+
+    if print_key:
+        typer.echo(key or "(no key; auth disabled or keyring unavailable)")
+        raise typer.Exit(0)
+
     ensure_api_key_env(name)
     pm.bridge_auth(prof)
-
-    key = None
-    if config.openai_server.require_auth:
-        key = get_secret("openai_api_key", name)
-        if rotate_key or not key:
-            key = "sk-artemis-" + _secrets.token_urlsafe(24)
-            set_secret("openai_api_key", key, name)
     h, p = config.openai_server.host, config.openai_server.port
     base = f"http://{h}:{p}/v1"
     typer.secho(f"Artemis OpenAI endpoint: {base}", fg=typer.colors.GREEN)

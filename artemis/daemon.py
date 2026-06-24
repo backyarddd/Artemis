@@ -96,7 +96,13 @@ class Daemon:
                 self.log.exception("webhook server unavailable")
         if self.config.openai_server.enabled:
             try:
-                from .server.openai_api import OpenAIServer
+                from .server.openai_api import OpenAIServer, ensure_openai_key
+                if self.config.openai_server.require_auth:
+                    if ensure_openai_key(self.profile_name):
+                        self.log.info("openai endpoint key ready (view: artemis serve --print-key)")
+                    else:
+                        self.log.warning("openai endpoint requires auth but no key could be "
+                                         "stored; it will reject requests until ARTEMIS_OPENAI_API_KEY is set")
                 self.openai_server = OpenAIServer(self.profile, self.config)
             except Exception:
                 self.log.exception("openai server unavailable")

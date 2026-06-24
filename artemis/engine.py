@@ -246,6 +246,8 @@ class Engine:
         text_indices: set[int] = set()
         finish_reason = "stop"
         usage: dict = {}
+        errored = False
+        error_text = ""
 
         def remainder(full: str) -> str:
             nonlocal emitted
@@ -286,17 +288,28 @@ class Engine:
                     usage = msg.usage or {}
                     if msg.total_cost_usd:
                         self.cost.add("openai", msg.total_cost_usd)
-                    if msg.result:
+                    if msg.is_error:
+                        errored = True
+                        error_text = (msg.result
+                                      or ("; ".join(msg.errors) if msg.errors else "")
+                                      or "engine error")
+                    elif msg.result:
+                        # Do not clobber a mapped finish_reason (e.g. length).
                         tail = remainder(msg.result)
                         if tail:
                             yield {"type": "delta", "text": tail}
-                    if msg.is_error:
-                        finish_reason = "stop"
         except Exception as exc:
             self.log.exception("openai_complete failed")
             yield {"type": "error", "message": f"{type(exc).__name__}: {exc}"}
             return
 
+        # A structured SDK failure with no usable text is an error, not an empty
+        # success. If text already streamed, deliver it and log the failure.
+        if errored and not emitted:
+            yield {"type": "error", "message": error_text}
+            return
+        if errored:
+            self.log.warning("openai_complete: partial output then engine error: %s", error_text)
         yield {"type": "final", "finish_reason": finish_reason,
                "usage": _map_usage(usage), "text": emitted}
 

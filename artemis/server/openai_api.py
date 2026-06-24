@@ -22,10 +22,23 @@ import uvicorn
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 
-from ..config import GlobalConfig, get_secret
+from ..config import GlobalConfig, get_secret, set_secret
 from ..engine import Engine
 from ..observability import get_logger
 from ..profiles import Profile
+
+
+def ensure_openai_key(profile_name: str, generate: bool = True) -> Optional[str]:
+    """Return the endpoint API key, generating and persisting one if absent.
+
+    Returns None only when no key exists and it could not be persisted (no
+    keyring backend) - callers must then fail closed rather than serve open."""
+    key = get_secret("openai_api_key", profile_name)
+    if key or not generate:
+        return key
+    import secrets
+    candidate = "sk-artemis-" + secrets.token_urlsafe(24)
+    return candidate if set_secret("openai_api_key", candidate, profile_name) else None
 
 # Claude models advertised by GET /v1/models (clients may pass any of these,
 # or any custom string, as `model`).
@@ -165,6 +178,7 @@ class OpenAIServer:
         self.config = config
         self.engine = Engine(profile, config)
         self.log = get_logger("artemis.openai", profile.logs_dir, config.log_level)
+        self._api_key = get_secret("openai_api_key", profile.name)
         self.app = self._build_app()
         self._server: Optional[uvicorn.Server] = None
         self._serve_task = None
@@ -175,12 +189,15 @@ class OpenAIServer:
     def _check_auth(self, request: Request) -> Optional[JSONResponse]:
         if not self.config.openai_server.require_auth:
             return None
-        key = get_secret("openai_api_key", self.profile.name)
-        if not key:
-            return None  # nothing to enforce against; treat as open
+        if not self._api_key:
+            # Fail closed: never serve open when auth was requested but no key
+            # could be provisioned (e.g. no keyring backend).
+            return _error("Endpoint requires auth but no API key is configured. "
+                          "Run 'artemis serve --rotate-key' or set ARTEMIS_OPENAI_API_KEY.",
+                          "authentication_error", 503)
         header = request.headers.get("authorization", "")
         token = header[7:].strip() if header.lower().startswith("bearer ") else ""
-        if token != key:
+        if token != self._api_key:
             return _error("Invalid API key.", "authentication_error", 401)
         return None
 
@@ -223,7 +240,8 @@ class OpenAIServer:
             run_model = resolve_model(requested_model, server.config.default_model)
             system, prompt = render_messages(messages)
             stream = bool(body.get("stream", False))
-            include_usage = bool((body.get("stream_options") or {}).get("include_usage", False))
+            so = body.get("stream_options")
+            include_usage = bool(so.get("include_usage", False)) if isinstance(so, dict) else False
 
             if stream:
                 return StreamingResponse(
@@ -281,8 +299,10 @@ class OpenAIServer:
             return
         yield _sse(_chunk(cid, created, echo_model, {},
                           final["finish_reason"] if final else "stop"))
-        if include_usage and final:
-            yield _sse(_usage_chunk(cid, created, echo_model, final["usage"]))
+        if include_usage:
+            usage = final["usage"] if final else {
+                "prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+            yield _sse(_usage_chunk(cid, created, echo_model, usage))
         yield "data: [DONE]\n\n"
 
     # ----- lifecycle -------------------------------------------------------

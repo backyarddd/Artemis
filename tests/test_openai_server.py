@@ -118,6 +118,59 @@ def test_streaming_usage_chunk(profile):
     assert usage_chunks and usage_chunks[0]["usage"]["total_tokens"] == 8
 
 
+def test_stream_options_non_dict_tolerated(profile):
+    """Regression: a malformed truthy stream_options must not 500."""
+    client = TestClient(_server(profile).app)
+    r = client.post("/v1/chat/completions", json={
+        "model": "m", "messages": [{"role": "user", "content": "hi"}],
+        "stream_options": "bogus"})
+    assert r.status_code == 200
+
+
+def test_engine_error_surfaces_non_streaming(profile):
+    """Regression: an engine error event becomes a 500 error envelope."""
+    server = _server(profile)
+
+    async def err(system, prompt, model):
+        yield {"type": "error", "message": "auth failed"}
+
+    server.engine.openai_complete = err
+    client = TestClient(server.app)
+    r = client.post("/v1/chat/completions",
+                    json={"model": "m", "messages": [{"role": "user", "content": "hi"}]})
+    assert r.status_code == 500
+    assert r.json()["error"]["message"] == "auth failed"
+
+
+def test_engine_error_surfaces_streaming(profile):
+    server = _server(profile)
+
+    async def err(system, prompt, model):
+        yield {"type": "error", "message": "boom"}
+
+    server.engine.openai_complete = err
+    client = TestClient(server.app)
+    with client.stream("POST", "/v1/chat/completions", json={
+            "model": "m", "messages": [{"role": "user", "content": "hi"}],
+            "stream": True}) as r:
+        events = [ln[6:] for ln in r.iter_lines() if ln.startswith("data: ")]
+    assert events[-1] == "[DONE]"
+    assert any("error" in e and "boom" in e for e in events[:-1])
+
+
+def test_auth_fails_closed_without_key(profile):
+    """Regression: require_auth True but no key configured must reject, not
+    serve open."""
+    server = _server(profile, require_auth=True)
+    server._api_key = None  # simulate no key provisioned / no keyring backend
+    client = TestClient(server.app)
+    r = client.post("/v1/chat/completions",
+                    headers={"Authorization": "Bearer anything"},
+                    json={"model": "m", "messages": [{"role": "user", "content": "hi"}]})
+    assert r.status_code == 503
+    assert r.json()["error"]["type"] == "authentication_error"
+
+
 def test_auth_enforced(profile, monkeypatch):
     # Provide the key via env (get_secret checks env before keyring) so the test
     # never touches the real OS keychain.
