@@ -1,0 +1,41 @@
+# Non-interactive setup answers. Run:
+#   artemis setup -n --answers answers.yaml
+# Secrets may also come from env (ARTEMIS_TELEGRAM_TOKEN, ARTEMIS_DISCORD_TOKEN,
+# ARTEMIS_WEBHOOK_SECRET, ANTHROPIC_API_KEY) instead of being written here.
+
+profile: default
+persona: Artemis
+
+# subscription (reuse claude login) or api_key
+auth: subscription
+# anthropic_api_key: sk-ant-...        # only when auth: api_key
+
+approval_mode: auto                    # bypass | auto | ask
+
+budgets:
+  per_task_usd: 1.0
+  daily_usd: 20.0
+
+channels:
+  telegram:
+    token: "123456:ABC..."            # from @BotFather (or set ARTEMIS_TELEGRAM_TOKEN)
+    allow: ["11111111"]               # allowlisted numeric user ids
+    default_conversation: "11111111"  # where cron/goal-loop results are sent
+  # discord:
+  #   token: "..."
+  #   allow: ["22222222"]
+  #   default_conversation: "33333333"  # channel id
+
+mcp:
+  # example_fs:
+  #   command: "npx"
+  #   args: ["-y", "@modelcontextprotocol/server-filesystem", "/some/dir"]
+
+goals:
+  - Keep the workspace inbox triaged and summarized
+
+crons:
+  - schedule: "0 9 * * *"
+    prompt: "Post a morning standup summary of recent activity"
+
+service: none                          # launchd | systemd | docker | none
