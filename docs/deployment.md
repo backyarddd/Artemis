@@ -1,21 +1,21 @@
 # Deployment
 
-Artemis runs as an always-on daemon: `python -m artemis daemon run`. The
+Artemis runs as an always-on gateway: `python -m artemis gateway run`. The
 supervisor starts the channel gateway, task queue worker, cron scheduler,
 optional webhook server, optional OpenAI endpoint, and the autonomous goal loop,
 and shuts them all down cleanly on SIGTERM (stop accepting, drain the running
 task, flush state, exit).
 
-`artemis daemon install` detects the OS and installs the matching service.
-`artemis daemon status|stop|restart|uninstall` work the same on every platform.
+`artemis gateway install` detects the OS and installs the matching service.
+`artemis gateway status|stop|restart|uninstall` work the same on every platform.
 
 ## macOS (launchd)
 
 ```bash
-uv run artemis daemon install            # writes ~/Library/LaunchAgents/com.artemis.agent.plist and loads it
-uv run artemis daemon status
-uv run artemis daemon restart
-uv run artemis daemon uninstall
+artemis gateway install            # writes ~/Library/LaunchAgents/com.artemis.agent.plist and loads it
+artemis gateway status
+artemis gateway restart
+artemis gateway uninstall
 ```
 
 The LaunchAgent uses `RunAtLoad` + `KeepAlive` (restart on crash, survive
@@ -24,9 +24,9 @@ sleep/wake) and writes logs under `$ARTEMIS_HOME`.
 ## Linux (systemd user unit)
 
 ```bash
-uv run artemis daemon install            # writes ~/.config/systemd/user/artemis.service and enables it
+artemis gateway install            # writes ~/.config/systemd/user/artemis.service and enables it
 loginctl enable-linger "$USER"           # so it runs without an active login session
-uv run artemis daemon status
+artemis gateway status
 ```
 
 The unit uses `Restart=on-failure`.
@@ -34,7 +34,7 @@ The unit uses `Restart=on-failure`.
 ## Docker
 
 ```bash
-uv run artemis daemon install --method docker   # generates Dockerfile, docker-compose.yml, .env.example
+artemis gateway install --method docker   # generates Dockerfile, docker-compose.yml, .env.example
 cp .env.example .env                            # fill in secrets
 docker compose up -d --build
 ```
@@ -58,7 +58,7 @@ For headless servers and Docker, drive the whole wizard from an answers file or
 environment variables:
 
 ```bash
-uv run artemis setup -n --answers answers.yaml
+artemis setup -n --answers answers.yaml
 ```
 
 Secrets in the answers file are optional; they can come from environment
@@ -67,6 +67,6 @@ variables instead. See [`answers.example.yaml`](../answers.example.yaml).
 ## Verifying a deployment
 
 ```bash
-uv run artemis doctor      # isolation proof + auth + budgets
-uv run artemis daemon status
+artemis doctor      # isolation proof + auth + budgets
+artemis gateway status
 ```

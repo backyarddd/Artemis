@@ -71,7 +71,7 @@ denies the channel.
 
 The endpoint defaults to binding `127.0.0.1` with `require_auth: true` and a
 Bearer key. The auth check **fails closed**: if auth is required but no key is
-configured, requests are rejected with `503` rather than served open. The daemon
+configured, requests are rejected with `503` rather than served open. The gateway
 provisions and persists a key on start when one is missing (retrieve it with
 `artemis serve --print-key`). Exposing the endpoint beyond localhost requires
 setting a non-loopback `host` deliberately; keep `require_auth` on if you do.

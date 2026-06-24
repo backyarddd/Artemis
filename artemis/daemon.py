@@ -108,7 +108,7 @@ class Daemon:
                 self.log.exception("openai server unavailable")
 
     async def run(self) -> None:
-        self.log.info("starting daemon for profile '%s'", self.profile_name)
+        self.log.info("starting gateway for profile '%s'", self.profile_name)
         await self.queue.start()
         await self.gateway.start()
         for part, name in ((self.scheduler, "scheduler"),
@@ -123,7 +123,7 @@ class Daemon:
                     self.log.exception("failed to start %s", name)
 
         self._install_signals()
-        self.log.info("daemon up; %d channel(s)", len(self.gateway.adapters))
+        self.log.info("gateway up; %d channel(s)", len(self.gateway.adapters))
         await self._stop.wait()
         await self.shutdown()
 
@@ -151,7 +151,7 @@ class Daemon:
             await self.gateway.stop()
         except Exception:
             self.log.exception("error stopping gateway")
-        self.log.info("daemon stopped cleanly")
+        self.log.info("gateway stopped cleanly")
 
 
 async def run_daemon(profile_name: Optional[str] = None, foreground: bool = False) -> None:

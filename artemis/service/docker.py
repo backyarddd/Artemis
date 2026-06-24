@@ -29,7 +29,7 @@ RUN uv sync --frozen
 ENV ARTEMIS_HOME=/data
 VOLUME ["/data"]
 
-CMD ["uv", "run", "python", "-m", "artemis", "daemon", "run"]
+CMD ["uv", "run", "python", "-m", "artemis", "gateway", "run"]
 """
 
 _COMPOSE = """services:

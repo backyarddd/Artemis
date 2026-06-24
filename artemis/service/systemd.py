@@ -39,12 +39,12 @@ def render_unit(python: str, artemis_home: str, profile: Optional[str]) -> str:
     out_log = home / "daemon.out.log"
     err_log = home / "daemon.err.log"
     return f"""[Unit]
-Description=Artemis autonomous agent daemon
+Description=Artemis autonomous agent gateway
 After=network.target
 
 [Service]
 Type=simple
-ExecStart={python} -m artemis daemon run
+ExecStart={python} -m artemis gateway run
 Restart=on-failure
 RestartSec=10
 WorkingDirectory={artemis_home}

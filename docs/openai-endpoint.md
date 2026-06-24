@@ -15,7 +15,7 @@ artemis serve --rotate-key       # generate a fresh API key
 artemis serve --print-key        # print the current key and exit
 ```
 
-It also auto-starts with the daemon when `openai_server.enabled: true`. Configure
+It also auto-starts with the gateway when `openai_server.enabled: true`. Configure
 host/port/auth under `openai_server` in `config.yaml` (see
 [configuration.md](configuration.md)). Default bind is `127.0.0.1` with a
 required Bearer key.

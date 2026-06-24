@@ -43,7 +43,7 @@ trigger (cron | channel | webhook | goal loop)
 ## Why
 
 You already pay for a Claude subscription via `claude login`. Artemis turns that
-into a always-on autonomous agent you can reach from chat, schedule, trigger
+into an always-on autonomous agent you can reach from chat, schedule, trigger
 from webhooks, or call as an OpenAI API, without ever exposing or mutating your
 personal Claude Code environment. One install can host several isolated agent
 personas ("profiles"), each with its own workspace, tools, memory, and channels.
@@ -85,25 +85,30 @@ Requires Python 3.11+, [uv](https://docs.astral.sh/uv/), and either a
 ships bundled with the SDK; no separate install is needed.
 
 ```bash
-git clone https://github.com/backyarddd/artemis.git
-cd artemis
+git clone https://github.com/backyarddd/Artemis.git
+cd Artemis
 uv sync
+uv tool install --editable .   # installs the `artemis` command on your PATH
 ```
+
+The `uv tool install` step makes `artemis` available globally. Prefer not to
+install it? Drop the step and prefix every command with `uv run` instead
+(`uv run artemis setup`, etc.). All examples below assume the global command.
 
 ## Quick start
 
 ```bash
-uv run artemis setup            # guided wizard (re-runnable any time)
-uv run artemis doctor           # health + isolation proof
-uv run artemis run "summarize today's git activity in this workspace"
-uv run artemis daemon run -f    # run the daemon in the foreground
-uv run artemis daemon install   # install + start the OS service
+artemis setup            # guided wizard (re-runnable any time)
+artemis doctor           # health + isolation proof
+artemis run "summarize today's git activity in this workspace"
+artemis gateway run -f    # run the gateway in the foreground
+artemis gateway install   # install + start the OS service
 ```
 
 Headless / Docker provisioning with no prompts:
 
 ```bash
-uv run artemis setup -n --answers answers.yaml
+artemis setup -n --answers answers.yaml
 ```
 
 See [`answers.example.yaml`](answers.example.yaml) for the full schema.
@@ -114,13 +119,13 @@ Use Artemis as a drop-in OpenAI backend for any program. Enable it during
 `artemis setup`, or run it standalone:
 
 ```bash
-uv run artemis serve                 # foreground; prints base_url + API key
-uv run artemis serve --no-auth       # localhost, no key
-uv run artemis serve --port 8799 --rotate-key
-uv run artemis serve --print-key     # print the current API key and exit
+artemis serve                 # foreground; prints base_url + API key
+artemis serve --no-auth       # localhost, no key
+artemis serve --port 8799 --rotate-key
+artemis serve --print-key     # print the current API key and exit
 ```
 
-It also auto-starts with the daemon when `openai_server.enabled` is set. Point
+It also auto-starts with the gateway when `openai_server.enabled` is set. Point
 any OpenAI client at it:
 
 ```python
@@ -203,7 +208,7 @@ they resolve from environment variables first, then the OS keyring. See
 
 ## Deployment
 
-`artemis daemon install` detects the OS and installs the matching service:
+`artemis gateway install` detects the OS and installs the matching service:
 launchd (macOS), systemd user unit (Linux), or Docker. All survive restarts and
 shut down cleanly on SIGTERM. See [docs/deployment.md](docs/deployment.md).
 
@@ -217,9 +222,9 @@ gated unless you switch to bypass.
 
 ## Command reference
 
-`setup`, `run`, `serve`, `doctor`, `mode`, `daemon`, `profile`, `channel`,
-`mcp`, `skill`, `cmd`, `cron`, `memory`. Run `uv run artemis --help` or
-`uv run artemis <group> --help`. Full reference in
+`setup`, `run`, `serve`, `doctor`, `mode`, `gateway`, `profile`, `channel`,
+`mcp`, `skill`, `cmd`, `cron`, `memory`. Run `artemis --help` or
+`artemis <group> --help`. Full reference in
 [docs/commands.md](docs/commands.md).
 
 From any channel: `/help` `/mode [bypass|auto|ask]` `/status` `/pause`
@@ -241,7 +246,7 @@ artemis/
   queue.py           async task queue with persistence
   observability.py   logging, audit trail, cost tracking
   doctor.py          health + isolation proof
-  daemon.py          supervisor (gateway, queue, triggers, endpoint)
+  daemon.py          gateway supervisor (channels, queue, triggers, endpoint)
   channels/          base, gateway, cli, telegram, discord
   triggers/          scheduler, webhooks, goal_loop
   memory/            store (SQLite+FTS5), recall, extract
@@ -258,7 +263,7 @@ Each profile on disk (`$ARTEMIS_HOME/profiles/<name>/`) holds its own
 
 ```bash
 uv run pytest            # full unit + integration suite (no network)
-uv run artemis doctor    # live isolation proof (uses your session)
+artemis doctor    # live isolation proof (uses your session)
 ```
 
 House style: no em dashes, conventional commits, no AI attribution in git.
@@ -266,9 +271,9 @@ House style: no em dashes, conventional commits, no AI attribution in git.
 ## Limitations
 
 - The bash catastrophe guard is defense-in-depth, not a sandbox. For untrusted
-  workloads, run the daemon in the Docker image or an OS sandbox.
+  workloads, run the gateway in the Docker image or an OS sandbox.
 - CLI approvals use a blocking stdin read, intended for foreground use. On a
-  headless daemon an approval routed to the CLI channel fails safe (times out to
+  headless gateway an approval routed to the CLI channel fails safe (times out to
   deny); use Telegram/Discord for interactive approvals on a server.
 - The OpenAI endpoint is built on the Agent SDK, so it is a faithful text
   completion proxy but not a full parameter passthrough: sampling params

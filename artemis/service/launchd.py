@@ -60,7 +60,7 @@ def render_plist(python: str, artemis_home: str, profile: Optional[str]) -> str:
         <string>{escape(python)}</string>
         <string>-m</string>
         <string>artemis</string>
-        <string>daemon</string>
+        <string>gateway</string>
         <string>run</string>
     </array>
     <key>RunAtLoad</key>

@@ -166,45 +166,47 @@ async def _run_once(prompt: str, profile: Optional[str], mode: Optional[str]) ->
 # daemon
 # ---------------------------------------------------------------------------
 
-daemon_app = typer.Typer(no_args_is_help=True, help="Run and manage the daemon.")
-app.add_typer(daemon_app, name="daemon")
+gateway_app = typer.Typer(no_args_is_help=True, help="Run and manage the gateway.")
+app.add_typer(gateway_app, name="gateway")
+# Hidden backward-compatible alias for the former 'daemon' command.
+app.add_typer(gateway_app, name="daemon", hidden=True)
 
 
-@daemon_app.command("run")
-def daemon_run(profile: Optional[str] = typer.Option(None),
-               foreground: bool = typer.Option(False, "--foreground", "-f")):
-    """Run the supervised daemon (used by service units)."""
+@gateway_app.command("run")
+def gateway_run(profile: Optional[str] = typer.Option(None),
+                foreground: bool = typer.Option(False, "--foreground", "-f")):
+    """Run the supervised gateway (used by service units)."""
     from .daemon import run_daemon
     anyio.run(run_daemon, profile, foreground)
 
 
-@daemon_app.command("install")
-def daemon_install(profile: Optional[str] = typer.Option(None),
-                   method: Optional[str] = typer.Option(None, help="launchd|systemd|docker")):
+@gateway_app.command("install")
+def gateway_install(profile: Optional[str] = typer.Option(None),
+                    method: Optional[str] = typer.Option(None, help="launchd|systemd|docker")):
     from .service import install as svc
     typer.echo(svc.install(method, profile))
 
 
-@daemon_app.command("status")
-def daemon_status(method: Optional[str] = typer.Option(None)):
+@gateway_app.command("status")
+def gateway_status(method: Optional[str] = typer.Option(None)):
     from .service import install as svc
     typer.echo(svc.status(method))
 
 
-@daemon_app.command("stop")
-def daemon_stop(method: Optional[str] = typer.Option(None)):
+@gateway_app.command("stop")
+def gateway_stop(method: Optional[str] = typer.Option(None)):
     from .service import install as svc
     typer.echo(svc.stop(method))
 
 
-@daemon_app.command("restart")
-def daemon_restart(method: Optional[str] = typer.Option(None)):
+@gateway_app.command("restart")
+def gateway_restart(method: Optional[str] = typer.Option(None)):
     from .service import install as svc
     typer.echo(svc.restart(method))
 
 
-@daemon_app.command("uninstall")
-def daemon_uninstall(method: Optional[str] = typer.Option(None)):
+@gateway_app.command("uninstall")
+def gateway_uninstall(method: Optional[str] = typer.Option(None)):
     from .service import install as svc
     typer.echo(svc.uninstall(method))
 

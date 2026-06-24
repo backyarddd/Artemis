@@ -27,8 +27,8 @@ except Exception:
 CHEAT = """
 Artemis is ready. Quick reference:
   artemis run "do something"        run a one-off task
-  artemis daemon run -f             run the daemon in the foreground
-  artemis daemon install            install + start the OS service
+  artemis gateway run -f            run the gateway in the foreground
+  artemis gateway install           install + start the OS service
   artemis doctor                    health + isolation check
   artemis mode auto|ask|bypass      set approval posture
   artemis cmd list | cmd run NAME   saved commands
@@ -288,7 +288,7 @@ class Wizard:
         base = f"http://{cfg.openai_server.host}:{cfg.openai_server.port}/v1"
         out(f"OpenAI endpoint enabled at {base}")
         out(f"  API key: {key if key else '(auth disabled)'}")
-        out("  Starts with the daemon, or run 'artemis serve' now.")
+        out("  Starts with the gateway, or run 'artemis serve' now.")
 
     def _step_service(self, profile) -> None:
         from .service import install as svc
@@ -300,7 +300,7 @@ class Wizard:
             except Exception as exc:
                 out(f"service install failed: {exc}")
         else:
-            out("skipping service install; run 'artemis daemon run -f' for foreground.")
+            out("skipping service install; run 'artemis gateway run -f' for foreground.")
 
     async def _step_verify(self, profile) -> None:
         from .doctor import doctor, format_report
@@ -361,4 +361,4 @@ async def channel_subwizard(channel_type: str) -> None:
         out(f"unknown channel type: {channel_type}")
         return
     cfg.save()
-    out("channel saved; restart the daemon to pick it up.")
+    out("channel saved; restart the gateway to pick it up.")

@@ -1,9 +1,9 @@
 # Command reference
 
-Run `uv run artemis --help` or `uv run artemis <group> --help` for live help.
+Run `artemis --help` or `artemis <group> --help` for live help.
 All state-mutating commands operate on the active profile (set by
 `ARTEMIS_PROFILE` or `default_profile`). Changes to cron, MCP, and commands take
-effect on the next daemon start.
+effect on the next gateway start.
 
 ## Top-level
 
@@ -15,14 +15,14 @@ effect on the next daemon start.
 | `artemis doctor [--profile] [--no-isolation]` | Health and isolation self-check |
 | `artemis mode [bypass\|auto\|ask]` | Show or set the active profile's default approval mode |
 
-## daemon
+## gateway
 
 | Command | Description |
 |---------|-------------|
-| `artemis daemon run [--profile] [-f]` | Run the supervised daemon (used by service units) |
-| `artemis daemon install [--method launchd\|systemd\|docker]` | Install + start the OS service |
-| `artemis daemon status` | Service status |
-| `artemis daemon stop` / `restart` / `uninstall` | Manage the service |
+| `artemis gateway run [--profile] [-f]` | Run the supervised gateway (used by service units) |
+| `artemis gateway install [--method launchd\|systemd\|docker]` | Install + start the OS service |
+| `artemis gateway status` | Service status |
+| `artemis gateway stop` / `restart` / `uninstall` | Manage the service |
 
 ## profile
 
