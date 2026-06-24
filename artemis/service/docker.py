@@ -45,6 +45,10 @@ _COMPOSE = """services:
     volumes:
       - ./data:/data
     restart: unless-stopped
+    # To expose the OpenAI-compatible endpoint, set openai_server.host=0.0.0.0
+    # in config and uncomment:
+    # ports:
+    #   - "8799:8799"
 """
 
 _ENV_EXAMPLE = """# Artemis container secrets. Copy to .env and fill in.
@@ -57,6 +61,9 @@ ARTEMIS_DISCORD_TOKEN=
 
 # Inbound webhook HMAC secret.
 ARTEMIS_WEBHOOK_SECRET=
+
+# OpenAI-compatible endpoint API key (Bearer). Auto-generated if blank.
+ARTEMIS_OPENAI_API_KEY=
 """
 
 

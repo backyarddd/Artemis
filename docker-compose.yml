@@ -11,3 +11,7 @@ services:
     volumes:
       - ./data:/data
     restart: unless-stopped
+    # To expose the OpenAI-compatible endpoint, set openai_server.host=0.0.0.0
+    # in config and uncomment:
+    # ports:
+    #   - "8799:8799"

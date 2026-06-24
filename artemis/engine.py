@@ -214,6 +214,109 @@ class Engine:
         return "".join(out).strip()
 
 
+    async def openai_complete(self, system: str, prompt: str,
+                              model: Optional[str] = None):
+        """Async generator for the OpenAI-compatible endpoint: a pure text
+        completion in the isolated profile (no persona, no tools, no approval,
+        thinking off). Yields {"type":"delta","text":...} as tokens arrive and a
+        final {"type":"final","finish_reason","usage","text"}.
+
+        Thinking blocks are never surfaced: only text-block deltas are emitted.
+        """
+        from claude_agent_sdk import (AssistantMessage, ClaudeAgentOptions,
+                                      ResultMessage, StreamEvent, TextBlock,
+                                      query)
+
+        opts = ClaudeAgentOptions(
+            model=model or self.config.default_model,
+            cwd=str(self.profile.workspace),
+            env={"CLAUDE_CONFIG_DIR": str(self.profile.claude_home)},
+            settings=str(self.profile.settings_json),
+            setting_sources=[],            # raw LLM: no skills, no project memory
+            mcp_servers={}, strict_mcp_config=True,
+            system_prompt=system or "You are a helpful assistant.",
+            permission_mode="default",
+            tools=[],                      # no tools available: pure text model
+            max_turns=1,
+            thinking={"type": "disabled"},
+            include_partial_messages=True,
+        )
+
+        emitted = ""
+        text_indices: set[int] = set()
+        finish_reason = "stop"
+        usage: dict = {}
+
+        def remainder(full: str) -> str:
+            nonlocal emitted
+            if full.startswith(emitted) and len(full) > len(emitted):
+                tail = full[len(emitted):]
+                emitted = full
+                return tail
+            if not emitted:
+                emitted = full
+                return full
+            return ""
+
+        try:
+            async for msg in query(prompt=prompt, options=opts):
+                if isinstance(msg, StreamEvent):
+                    ev = msg.event or {}
+                    et = ev.get("type")
+                    if et == "content_block_start":
+                        if (ev.get("content_block") or {}).get("type") == "text":
+                            text_indices.add(ev.get("index"))
+                    elif et == "content_block_delta":
+                        d = ev.get("delta") or {}
+                        if d.get("type") == "text_delta" and ev.get("index") in text_indices:
+                            emitted += d.get("text", "")
+                            if d.get("text"):
+                                yield {"type": "delta", "text": d["text"]}
+                    elif et == "message_delta":
+                        sr = (ev.get("delta") or {}).get("stop_reason")
+                        if sr:
+                            finish_reason = _map_stop_reason(sr)
+                elif isinstance(msg, AssistantMessage):
+                    for b in msg.content:
+                        if isinstance(b, TextBlock):
+                            tail = remainder(b.text)
+                            if tail:
+                                yield {"type": "delta", "text": tail}
+                elif isinstance(msg, ResultMessage):
+                    usage = msg.usage or {}
+                    if msg.total_cost_usd:
+                        self.cost.add("openai", msg.total_cost_usd)
+                    if msg.result:
+                        tail = remainder(msg.result)
+                        if tail:
+                            yield {"type": "delta", "text": tail}
+                    if msg.is_error:
+                        finish_reason = "stop"
+        except Exception as exc:
+            self.log.exception("openai_complete failed")
+            yield {"type": "error", "message": f"{type(exc).__name__}: {exc}"}
+            return
+
+        yield {"type": "final", "finish_reason": finish_reason,
+               "usage": _map_usage(usage), "text": emitted}
+
+
+def _map_stop_reason(sr: str) -> str:
+    return {"end_turn": "stop", "stop_sequence": "stop", "max_tokens": "length",
+            "tool_use": "tool_calls"}.get(sr, "stop")
+
+
+def _map_usage(u: dict) -> dict:
+    if not u:
+        return {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+    prompt = (int(u.get("input_tokens", 0) or 0)
+              + int(u.get("cache_read_input_tokens", 0) or 0)
+              + int(u.get("cache_creation_input_tokens", 0) or 0))
+    completion = int(u.get("output_tokens", 0) or 0)
+    return {"prompt_tokens": prompt, "completion_tokens": completion,
+            "total_tokens": prompt + completion}
+
+
 def _tool_summary(name: str, tool_input: dict) -> str:
     if name == "Bash":
         return f"$ {str(tool_input.get('command',''))[:80]}"

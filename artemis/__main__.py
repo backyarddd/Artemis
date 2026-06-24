@@ -13,7 +13,9 @@ from typing import Optional
 import anyio
 import typer
 
-from .config import GlobalConfig, ensure_api_key_env
+import secrets as _secrets
+
+from .config import (GlobalConfig, ensure_api_key_env, get_secret, set_secret)
 from .models import ApprovalMode, ChannelTarget, Task, TaskSource
 from .profiles import ProfileManager
 
@@ -77,6 +79,55 @@ def mode(value: Optional[str] = typer.Argument(None, help="bypass|auto|ask")):
     state.approval_mode = m
     state.save()
     typer.echo(f"approval mode set to {m.value}")
+
+
+@app.command()
+def serve(host: Optional[str] = typer.Option(None, help="bind host (default 127.0.0.1)"),
+          port: Optional[int] = typer.Option(None, help="bind port (default 8799)"),
+          profile: Optional[str] = typer.Option(None),
+          no_auth: bool = typer.Option(False, "--no-auth", help="disable Bearer key check"),
+          rotate_key: bool = typer.Option(False, "--rotate-key", help="generate a fresh API key")):
+    """Run the OpenAI-compatible HTTP endpoint in the foreground.
+
+    Point any OpenAI client at the printed base_url. Other programs then use your
+    Claude subscription as a drop-in OpenAI backend.
+    """
+    import uvicorn
+    from .server.openai_api import OpenAIServer
+
+    pm = ProfileManager()
+    name = profile or pm.active_name()
+    try:
+        prof = pm.get(name)
+    except FileNotFoundError:
+        typer.secho("No profile. Run 'artemis setup'.", fg=typer.colors.RED)
+        raise typer.Exit(1)
+    config = GlobalConfig.load()
+    if host:
+        config.openai_server.host = host
+    if port:
+        config.openai_server.port = port
+    if no_auth:
+        config.openai_server.require_auth = False
+    ensure_api_key_env(name)
+    pm.bridge_auth(prof)
+
+    key = None
+    if config.openai_server.require_auth:
+        key = get_secret("openai_api_key", name)
+        if rotate_key or not key:
+            key = "sk-artemis-" + _secrets.token_urlsafe(24)
+            set_secret("openai_api_key", key, name)
+    h, p = config.openai_server.host, config.openai_server.port
+    base = f"http://{h}:{p}/v1"
+    typer.secho(f"Artemis OpenAI endpoint: {base}", fg=typer.colors.GREEN)
+    typer.echo(f"  API key: {key if key else '(auth disabled)'}")
+    typer.echo(f"  Example: curl {base}/chat/completions -H 'Authorization: Bearer "
+               f"{key or 'EMPTY'}' -H 'Content-Type: application/json' "
+               f"-d '{{\"model\":\"{config.default_model}\",\"messages\":"
+               f"[{{\"role\":\"user\",\"content\":\"hi\"}}]}}'")
+    server = OpenAIServer(prof, config)
+    uvicorn.run(server.app, host=h, port=p, log_level="warning")
 
 
 async def _run_once(prompt: str, profile: Optional[str], mode: Optional[str]) -> None:

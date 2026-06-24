@@ -31,6 +31,9 @@ approval buttons, and is configured end to end through a guided setup wizard.
   can author a new command that lands pending one-tap approval.
 - **Memory.** SQLite + FTS5 recall injected into the system prompt, with
   post-task durable-fact extraction and per-conversation session resume.
+- **OpenAI-compatible endpoint.** An optional HTTP server exposes
+  `/v1/chat/completions` and `/v1/models`, so any program that speaks the OpenAI
+  API can use your Claude subscription as a drop-in backend (streaming included).
 - **Deploys anywhere.** First-class installers for launchd (macOS), systemd
   (Linux user unit), and Docker. Clean SIGTERM drain everywhere.
 
@@ -59,12 +62,46 @@ channels, MCP, goals, crons, budgets, service).
 
 ## Commands
 
-CLI: `setup`, `run`, `doctor`, `mode`, `daemon`, `profile`, `channel`, `mcp`,
-`skill`, `cmd`, `cron`, `memory`. Run `uv run artemis --help` or
+CLI: `setup`, `run`, `serve`, `doctor`, `mode`, `daemon`, `profile`, `channel`,
+`mcp`, `skill`, `cmd`, `cron`, `memory`. Run `uv run artemis --help` or
 `uv run artemis <group> --help`.
 
 From any channel: `/help` `/mode [bypass|auto|ask]` `/status` `/pause`
 `/resume` `/cmd <name> k=v` `/cmd list` `/mcp` `/skills` `/profile`.
+
+## OpenAI-compatible endpoint
+
+Use Artemis as a drop-in OpenAI backend for any program. Enable it in `artemis
+setup` (or run it standalone):
+
+```bash
+uv run artemis serve                 # foreground; prints base_url + API key
+uv run artemis serve --no-auth       # localhost, no key
+uv run artemis serve --port 8799 --rotate-key
+```
+
+It also auto-starts with the daemon when `openai_server.enabled` is set. Then
+point any OpenAI client at it:
+
+```python
+from openai import OpenAI
+client = OpenAI(base_url="http://127.0.0.1:8799/v1", api_key="sk-artemis-...")
+client.chat.completions.create(
+    model="claude-sonnet-4-6",        # or any name; non-Claude names map to a default
+    messages=[{"role": "user", "content": "Hello"}],
+)
+```
+
+Endpoints: `POST /v1/chat/completions` (streaming and non-streaming) and
+`GET /v1/models`. Bind host/port and auth are configurable; default is
+`127.0.0.1` with a required Bearer key generated at setup. Requests run fully
+inside the isolated profile with no tools (pure text generation).
+
+It is built on the Claude Agent SDK, so it is a faithful **text** completion
+proxy but not a full parameter passthrough: `temperature`, `top_p`,
+`max_tokens`, `stop`, `n`, `seed`, penalties, `response_format`, and client-side
+`tools`/function-calling are accepted (never rejected) but not honored. Unknown
+fields and headers are ignored, per OpenAI client expectations.
 
 ## Architecture
 

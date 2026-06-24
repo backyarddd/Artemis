@@ -38,4 +38,12 @@ crons:
   - schedule: "0 9 * * *"
     prompt: "Post a morning standup summary of recent activity"
 
+# OpenAI-compatible HTTP endpoint for other programs (drop-in LLM backend).
+openai_server:
+  enabled: false
+  host: 127.0.0.1
+  port: 8799
+  require_auth: true
+  # api_key: sk-artemis-...   # optional; auto-generated if omitted (or set ARTEMIS_OPENAI_API_KEY)
+
 service: none                          # launchd | systemd | docker | none

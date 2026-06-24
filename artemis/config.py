@@ -54,6 +54,15 @@ class GoalLoopConfig:
 
 
 @dataclass
+class OpenAIServerConfig:
+    """OpenAI-compatible HTTP endpoint (a drop-in LLM backend for other apps)."""
+    enabled: bool = False
+    host: str = "127.0.0.1"
+    port: int = 8799
+    require_auth: bool = True  # require Bearer key matching the stored secret
+
+
+@dataclass
 class GlobalConfig:
     default_profile: str = "default"
     default_approval_mode: str = "auto"
@@ -67,6 +76,7 @@ class GlobalConfig:
     approval: ApprovalConfig = field(default_factory=ApprovalConfig)
     webhook: WebhookConfig = field(default_factory=WebhookConfig)
     goal_loop: GoalLoopConfig = field(default_factory=GoalLoopConfig)
+    openai_server: OpenAIServerConfig = field(default_factory=OpenAIServerConfig)
     log_level: str = "INFO"
 
     # ----- persistence -----------------------------------------------------
@@ -93,6 +103,8 @@ class GlobalConfig:
                 cfg.webhook = WebhookConfig(**(value or {}))
             elif key == "goal_loop":
                 cfg.goal_loop = GoalLoopConfig(**(value or {}))
+            elif key == "openai_server":
+                cfg.openai_server = OpenAIServerConfig(**(value or {}))
             else:
                 setattr(cfg, key, value)
         return cfg

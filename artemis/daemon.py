@@ -73,6 +73,7 @@ class Daemon:
         self.scheduler = None
         self.goal_loop = None
         self.webhooks = None
+        self.openai_server = None
         self._build_triggers()
 
     def _build_triggers(self) -> None:
@@ -93,6 +94,12 @@ class Daemon:
                 self.webhooks = WebhookServer(self.profile, self.config, self.queue.enqueue)
             except Exception:
                 self.log.exception("webhook server unavailable")
+        if self.config.openai_server.enabled:
+            try:
+                from .server.openai_api import OpenAIServer
+                self.openai_server = OpenAIServer(self.profile, self.config)
+            except Exception:
+                self.log.exception("openai server unavailable")
 
     async def run(self) -> None:
         self.log.info("starting daemon for profile '%s'", self.profile_name)
@@ -100,7 +107,8 @@ class Daemon:
         await self.gateway.start()
         for part, name in ((self.scheduler, "scheduler"),
                            (self.goal_loop, "goal_loop"),
-                           (self.webhooks, "webhooks")):
+                           (self.webhooks, "webhooks"),
+                           (self.openai_server, "openai_server")):
             if part:
                 try:
                     await part.start()
@@ -123,7 +131,7 @@ class Daemon:
 
     async def shutdown(self) -> None:
         self.log.info("shutting down; draining queue")
-        for part in (self.scheduler, self.goal_loop, self.webhooks):
+        for part in (self.scheduler, self.goal_loop, self.webhooks, self.openai_server):
             if part:
                 try:
                     await part.stop()

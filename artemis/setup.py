@@ -105,6 +105,7 @@ class Wizard:
         self._step_skills_commands(profile)
         self._step_goals_schedule(profile)
         self._step_budgets()
+        self._step_openai_server(profile)
         self._step_service(profile)
         await self._step_verify(profile)
         out(CHEAT)
@@ -258,6 +259,36 @@ class Wizard:
             out("invalid budget value; keeping defaults")
         cfg.save()
         out(f"budgets: ${cfg.budgets.per_task_usd}/task, ${cfg.budgets.daily_usd}/day")
+
+    def _step_openai_server(self, profile) -> None:
+        import secrets as _secrets
+        cfg = GlobalConfig.load()
+        spec = self.answers.get("openai_server")
+        if spec is None:
+            if not (self.interactive and self.confirm(
+                    "_oai", "Expose an OpenAI-compatible HTTP endpoint for other apps?",
+                    default=False)):
+                return
+            spec = {"enabled": True}
+            port = self.ask("openai_port", "Port", default=str(cfg.openai_server.port))
+            spec["port"] = int(port) if port else cfg.openai_server.port
+        if not spec.get("enabled"):
+            return
+        cfg.openai_server.enabled = True
+        cfg.openai_server.host = spec.get("host", cfg.openai_server.host)
+        cfg.openai_server.port = int(spec.get("port", cfg.openai_server.port))
+        cfg.openai_server.require_auth = spec.get("require_auth", True)
+        cfg.save()
+        key = None
+        if cfg.openai_server.require_auth:
+            key = spec.get("api_key") or get_secret("openai_api_key", profile.name)
+            if not key:
+                key = "sk-artemis-" + _secrets.token_urlsafe(24)
+            set_secret("openai_api_key", key, profile.name)
+        base = f"http://{cfg.openai_server.host}:{cfg.openai_server.port}/v1"
+        out(f"OpenAI endpoint enabled at {base}")
+        out(f"  API key: {key if key else '(auth disabled)'}")
+        out("  Starts with the daemon, or run 'artemis serve' now.")
 
     def _step_service(self, profile) -> None:
         from .service import install as svc
