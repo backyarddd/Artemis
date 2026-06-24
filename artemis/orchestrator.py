@@ -28,6 +28,8 @@ CHEAT_SHEET = """Artemis commands:
 /pause  /resume      pause or resume the autonomous goal loop
 /cmd <name> k=v ...  run a saved command
 /cmd list            list saved commands
+/cmd pending         list agent-authored commands awaiting approval
+/cmd approve <name>  approve an agent-authored command
 /mcp                 list MCP servers
 /skills              list skills
 /profile [list|switch <name>]
@@ -266,6 +268,17 @@ class Orchestrator:
         if not args or args[0] == "list":
             cmds = ctx.commands.list()
             await send("Commands: " + (", ".join(c.name for c in cmds) if cmds else "none"))
+            return
+        if args[0] == "pending":
+            pend = [c.name for c in ctx.commands.list() if c.pending]
+            await send("Pending (agent-authored): " + (", ".join(pend) if pend else "none"))
+            return
+        if args[0] == "approve" and len(args) > 1:
+            try:
+                ctx.commands.approve(args[1])
+                await send(f"approved command '{args[1]}'")
+            except Exception as exc:
+                await send(f"approve failed: {exc}")
             return
         name = args[0]
         cmd_args = {}
