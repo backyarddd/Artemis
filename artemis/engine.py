@@ -80,11 +80,12 @@ class Engine:
     def build_options(self, task: Task, spec: EngineRunSpec):
         from claude_agent_sdk import ClaudeAgentOptions
 
-        allow = list(task.allowed_tools_override or [])
-        for meta in ("Agent", "Task"):
-            if meta not in allow:
-                allow.append(meta)
-
+        # can_use_tool is the single source of approval truth. SDK allow rules
+        # are evaluated BEFORE the callback, so anything listed in allowed_tools
+        # would skip gating entirely (even in ask mode). Keep it empty and let
+        # the router classify every call. A command's declared tool set is a
+        # scoping restriction, applied via `tools` (availability), not approval.
+        restrict_tools = task.allowed_tools_override or None
         mcp = spec.mcp_servers if spec.mcp_servers is not None else load_mcp_servers(self.profile)
 
         return ClaudeAgentOptions(
@@ -99,7 +100,8 @@ class Engine:
             permission_mode="default",
             can_use_tool=spec.can_use_tool,
             hooks=spec.hooks,
-            allowed_tools=allow,
+            tools=restrict_tools,
+            allowed_tools=[],
             agents=spec.agents,
             max_turns=task.max_turns or DEFAULT_MAX_TURNS,
             max_budget_usd=task.max_budget_usd or self.config.budgets.per_task_usd,

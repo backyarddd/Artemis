@@ -38,6 +38,7 @@ class _ApprovalView(discord.ui.View):
                 self._future.set_result(decision)
             for child in self.children:
                 child.disabled = True
+            self.stop()
             label_text = _decision_label(decision)
             try:
                 await interaction.response.edit_message(
@@ -138,6 +139,7 @@ class DiscordAdapter(ChannelAdapter):
             return await fut
         finally:
             self._pending.pop(request.id, None)
+            view.stop()  # reclaim the view even if the router timed us out
 
     async def _resolve_channel(self, conversation_id: str):
         if self._client is None:

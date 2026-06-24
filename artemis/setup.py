@@ -249,10 +249,13 @@ class Wizard:
         if self.interactive and not b:
             per = self.ask("per_task_usd", "Per-task USD cap", default=str(cfg.budgets.per_task_usd))
             daily = self.ask("daily_usd", "Daily USD cap", default=str(cfg.budgets.daily_usd))
-        if per is not None:
-            cfg.budgets.per_task_usd = float(per)
-        if daily is not None:
-            cfg.budgets.daily_usd = float(daily)
+        try:
+            if per is not None:
+                cfg.budgets.per_task_usd = float(per)
+            if daily is not None:
+                cfg.budgets.daily_usd = float(daily)
+        except (TypeError, ValueError):
+            out("invalid budget value; keeping defaults")
         cfg.save()
         out(f"budgets: ${cfg.budgets.per_task_usd}/task, ${cfg.budgets.daily_usd}/day")
 

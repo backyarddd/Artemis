@@ -22,10 +22,11 @@ Runner = Callable[[Task], Awaitable[RunResult]]
 
 class TaskQueue:
     def __init__(self, profile, runner: Runner, concurrency: int = 1,
-                 log_level: str = "INFO"):
+                 log_level: str = "INFO", max_pending: int = 500):
         self.profile = profile
         self.runner = runner
         self.concurrency = max(1, concurrency)
+        self.max_pending = max_pending
         self._q: asyncio.Queue[Optional[Task]] = asyncio.Queue()
         self._pending: dict[str, Task] = {}
         self._running: dict[str, Task] = {}
@@ -58,6 +59,8 @@ class TaskQueue:
     async def enqueue(self, task: Task) -> str:
         if not self._accepting:
             raise RuntimeError("queue is shutting down; not accepting tasks")
+        if len(self._pending) >= self.max_pending:
+            raise RuntimeError(f"queue is full ({self.max_pending} pending); backpressure")
         async with self._lock:
             task.status = TaskStatus.QUEUED
             self._pending[task.id] = task
@@ -89,6 +92,8 @@ class TaskQueue:
                 self.log.warning("drain timed out; cancelling workers")
                 for w in self._workers:
                     w.cancel()
+                # Await cancellation so finally-blocks run and state is flushed.
+                await asyncio.gather(*self._workers, return_exceptions=True)
         self._workers = []
 
     def cancel(self, task_id: str) -> bool:

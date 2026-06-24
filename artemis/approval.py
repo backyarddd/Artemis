@@ -16,7 +16,6 @@ from __future__ import annotations
 import asyncio
 import json
 import re
-import shlex
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Awaitable, Callable, Optional
@@ -89,20 +88,20 @@ class ProfileState:
         }, indent=2))
 
     def is_allowlisted(self, tool_name: str, tool_input: dict) -> bool:
-        if tool_name in self.allowlist_tools:
-            return True
         if tool_name == "Bash":
+            # Exact normalized command only. A coarse prefix would let an
+            # approved "git push" also auto-approve "git push --force ...".
             cmd = _normalize_bash(str(tool_input.get("command", "")))
-            return any(cmd.startswith(p) for p in self.allowlist_bash)
-        return False
+            return cmd in self.allowlist_bash
+        return tool_name in self.allowlist_tools
 
     def add_allow(self, tool_name: str, tool_input: dict) -> str:
         if tool_name == "Bash":
-            prefix = _bash_prefix(str(tool_input.get("command", "")))
-            if prefix and prefix not in self.allowlist_bash:
-                self.allowlist_bash.append(prefix)
+            cmd = _normalize_bash(str(tool_input.get("command", "")))
+            if cmd and cmd not in self.allowlist_bash:
+                self.allowlist_bash.append(cmd)
             self.save()
-            return f"bash: {prefix}"
+            return f"bash: {cmd[:60]}"
         if tool_name not in self.allowlist_tools:
             self.allowlist_tools.append(tool_name)
         self.save()
@@ -111,15 +110,6 @@ class ProfileState:
 
 def _normalize_bash(command: str) -> str:
     return re.sub(r"\s+", " ", command.strip())
-
-
-def _bash_prefix(command: str) -> str:
-    """First two tokens, used as the 'always allow' match prefix."""
-    try:
-        toks = shlex.split(command.strip())
-    except ValueError:
-        toks = command.strip().split()
-    return " ".join(toks[:2]) if toks else command.strip()[:24]
 
 
 # ---------------------------------------------------------------------------
@@ -238,7 +228,7 @@ class ApprovalRouter:
 
             # Build prompt and request a human decision via the channel.
             summary, detail = summarize(tool_name, input_data)
-            pattern = (_bash_prefix(str(input_data.get("command", "")))
+            pattern = (_normalize_bash(str(input_data.get("command", "")))
                        if tool_name == "Bash" else tool_name)
             req = ApprovalRequest(tool_name=tool_name, summary=summary,
                                   detail=detail, reason=gate_reason, pattern=pattern)

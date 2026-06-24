@@ -110,7 +110,11 @@ class McpRegistry:
         # Launch briefly; an MCP server should stay up waiting on stdio. If it
         # exits immediately with a non-zero code, treat that as a crash.
         args = [str(a) for a in (config.get("args") or [])]
-        env = config.get("env") if isinstance(config.get("env"), dict) else None
+        # Merge over the current environment so the child keeps PATH/HOME etc;
+        # replacing it outright causes spurious test failures.
+        import os
+        cfg_env = config.get("env")
+        env = {**os.environ, **cfg_env} if isinstance(cfg_env, dict) else None
         try:
             proc = await asyncio.create_subprocess_exec(
                 resolved, *args,

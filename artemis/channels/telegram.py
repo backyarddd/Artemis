@@ -40,6 +40,7 @@ class TelegramAdapter(ChannelAdapter):
         self._pending: dict[str, asyncio.Future] = {}
         # short callback token -> request id (callback_data must stay < 64 bytes)
         self._token_map: dict[str, str] = {}
+        self._token_seq = 0
 
     async def start(self) -> None:
         app = ApplicationBuilder().token(self._token).build()
@@ -170,10 +171,15 @@ class TelegramAdapter(ChannelAdapter):
         fut.set_result(decision)
 
     def _short_token(self, request_id: str) -> str:
-        # Keep callback_data well under the 64-byte cap by mapping to a token.
+        # Keep callback_data under the 64-byte cap by mapping to a token. Use a
+        # monotonic counter (len() would collide as entries are popped on tap).
         token = request_id
         if len(f"{token}:always") > CALLBACK_DATA_LIMIT:
-            token = f"a{len(self._token_map)}"
+            self._token_seq += 1
+            token = f"a{self._token_seq}"
+            while token in self._token_map:
+                self._token_seq += 1
+                token = f"a{self._token_seq}"
         self._token_map[token] = request_id
         return token
 

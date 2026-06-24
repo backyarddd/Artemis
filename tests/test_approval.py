@@ -46,7 +46,10 @@ def test_profile_state_roundtrip(profile):
     again = ProfileState.load(profile)
     assert again.approval_mode is ApprovalMode.ASK
     assert "WebFetch" in again.allowlist_tools
-    assert again.is_allowlisted("Bash", {"command": "git push origin develop"})
+    # Exact command matches (whitespace-normalized); variations do not.
+    assert again.is_allowlisted("Bash", {"command": "git push  origin main"})
+    assert not again.is_allowlisted("Bash", {"command": "git push origin main --force"})
+    assert not again.is_allowlisted("Bash", {"command": "git push origin develop"})
 
 
 @pytest.mark.asyncio

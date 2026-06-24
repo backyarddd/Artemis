@@ -46,6 +46,43 @@ def test_guard_bash_destructive(profile):
     assert evaluate("Bash", {"command": "ls -la"}, ws, cfg).deny is False
 
 
+def test_guard_env_var_expansion_bypass(profile):
+    """Regression: $HOME / ${HOME} must be expanded so sacred paths can't slip
+    through as literal relative tokens."""
+    cfg = build_guard_config(profile)
+    ws = str(profile.workspace)
+    assert evaluate("Bash", {"command": "rm -rf $HOME/.claude"}, ws, cfg).deny
+    assert evaluate("Bash", {"command": "rm -rf ${HOME}/.claude"}, ws, cfg).deny
+    assert evaluate("Bash", {"command": "echo evil > $HOME/.claude/.credentials.json"}, ws, cfg).deny
+
+
+def test_guard_cd_compound_bypass(profile):
+    """Regression: cwd must be tracked across cd in compound commands."""
+    cfg = build_guard_config(profile)
+    ws = str(profile.workspace)
+    assert evaluate("Bash", {"command": "cd ~ && rm -rf .claude"}, ws, cfg).deny
+    assert evaluate("Bash", {"command": "cd /tmp ; cd ~ && rm -rf .hermes"}, ws, cfg).deny
+
+
+def test_guard_bash_reads_credentials(profile):
+    """Regression: arbitrary readers of operator credentials are denied."""
+    cfg = build_guard_config(profile)
+    ws = str(profile.workspace)
+    assert evaluate("Bash", {"command": "cat ~/.claude/.credentials.json"}, ws, cfg).deny
+    assert evaluate("Bash", {"command": "base64 $HOME/.claude/.credentials.json"}, ws, cfg).deny
+    assert evaluate("Bash",
+                    {"command": "python3 -c \"print(open('/Users/ai/.claude/.credentials.json').read())\""
+                     .replace("/Users/ai", str(__import__('pathlib').Path.home()))}, ws, cfg).deny
+
+
+def test_guard_rm_not_first_token(profile):
+    """Regression: 'rm' appearing earlier as an argument must not mislead the
+    target analysis for a later real rm."""
+    cfg = build_guard_config(profile)
+    ws = str(profile.workspace)
+    assert evaluate("Bash", {"command": "grep -r rm . && rm -rf $HOME/.claude"}, ws, cfg).deny
+
+
 @pytest.mark.asyncio
 async def test_live_hook_denies_under_bypass(profile):
     """The actual hook closure denies operator-config writes regardless of mode."""

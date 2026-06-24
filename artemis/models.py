@@ -30,7 +30,9 @@ class ApprovalMode(str, Enum):
     ASK = "ask"        # gate every tool call
 
     @classmethod
-    def coerce(cls, value: Any, default: "ApprovalMode" = None) -> "ApprovalMode":
+    def coerce(cls, value: Any, default: Optional["ApprovalMode"] = None) -> Optional["ApprovalMode"]:
+        """Parse a mode. Returns ``default`` (which may be None) when the value
+        is missing or unrecognized; callers that want AUTO pass it explicitly."""
         if isinstance(value, cls):
             return value
         if isinstance(value, str):
@@ -38,7 +40,7 @@ class ApprovalMode(str, Enum):
                 return cls(value.strip().lower())
             except ValueError:
                 pass
-        return default or cls.AUTO
+        return default
 
 
 class TaskSource(str, Enum):
