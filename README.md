@@ -141,6 +141,17 @@ assumptions here).
 - **Secrets** resolve from env (`ARTEMIS_<KEY>` or `ARTEMIS_<PROFILE>_<KEY>`)
   first, then the OS keyring. Tokens never land in `config.yaml`.
 
+## Known limitations
+
+- The bash catastrophe guard is defense-in-depth, not a sandbox. It expands
+  `~`/env vars, tracks `cd`, denies sacred-path references and unanalyzable
+  destructive commands, but path-based shell analysis is inherently
+  incomplete. For untrusted workloads, run the daemon in the Docker image or
+  an OS sandbox. Risky bash is also gated by the approval router in auto/ask.
+- CLI approvals use a blocking stdin read, intended for foreground use. In a
+  headless daemon an approval routed to the CLI channel fails safe (times out
+  to deny); use Telegram/Discord for interactive approvals on a server.
+
 ## Deferred to a later phase
 
 Self-improving skills/commands (reflection proposing `skills/auto/*` pending
