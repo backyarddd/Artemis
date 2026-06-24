@@ -1,0 +1,13 @@
+services:
+  artemis:
+    build: .
+    image: artemis:latest
+    container_name: artemis
+    env_file:
+      - .env
+    environment:
+      ARTEMIS_HOME: /data
+      ARTEMIS_PROFILE: default
+    volumes:
+      - ./data:/data
+    restart: unless-stopped

@@ -8,3 +8,8 @@ wheels/
 
 # Virtual environments
 .venv
+
+# Secrets and Docker runtime state
+.env
+/data/
+*.credentials.json
