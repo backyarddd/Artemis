@@ -52,13 +52,15 @@ def _abspath(path: str, cwd: str) -> Path:
     p = os.path.expanduser(path)
     if not os.path.isabs(p):
         p = os.path.join(cwd or os.getcwd(), p)
-    return Path(os.path.normpath(p))
+    # realpath resolves symlinks (e.g. macOS /tmp -> /private/tmp) so containment
+    # checks compare canonical paths; it tolerates a non-existent leaf.
+    return Path(os.path.realpath(p))
 
 
 def _within(path: Path, root: Path) -> bool:
     try:
-        path = Path(os.path.normpath(str(path)))
-        root = Path(os.path.normpath(str(root)))
+        path = Path(os.path.realpath(str(path)))
+        root = Path(os.path.realpath(str(root)))
         return path == root or root in path.parents
     except Exception:
         return False

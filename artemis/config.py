@@ -61,6 +61,8 @@ class GlobalConfig:
     # Per channel, the sender ids permitted to command the agent. Empty list
     # means "deny all" for that channel; absent channel means not configured.
     channel_allowlists: dict[str, list[str]] = field(default_factory=dict)
+    # Per-channel default conversation id for proactive delivery (cron/goal loop).
+    channel_defaults: dict[str, str] = field(default_factory=dict)
     budgets: BudgetConfig = field(default_factory=BudgetConfig)
     approval: ApprovalConfig = field(default_factory=ApprovalConfig)
     webhook: WebhookConfig = field(default_factory=WebhookConfig)
@@ -153,6 +155,19 @@ def set_secret(key: str, value: str, profile: Optional[str] = None) -> bool:
         return True
     except Exception:
         return False
+
+
+def ensure_api_key_env(profile: Optional[str] = None) -> None:
+    """If ANTHROPIC_API_KEY is not in env but stored as a secret, load it.
+
+    Lets headless/daemon runs use an API key saved during setup without the
+    operator exporting it manually. Subscription auth does not need this.
+    """
+    if os.environ.get("ANTHROPIC_API_KEY"):
+        return
+    key = get_secret("anthropic_api_key", profile)
+    if key:
+        os.environ["ANTHROPIC_API_KEY"] = key
 
 
 def delete_secret(key: str, profile: Optional[str] = None) -> None:

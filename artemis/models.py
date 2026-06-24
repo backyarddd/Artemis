@@ -117,6 +117,49 @@ class Task:
         text = (self.prompt or "").strip().replace("\n", " ")
         return (text[:80] + "...") if len(text) > 80 else text
 
+    def to_dict(self) -> dict[str, Any]:
+        ct = self.channel_target
+        return {
+            "id": self.id,
+            "prompt": self.prompt,
+            "command_ref": self.command_ref,
+            "command_args": self.command_args,
+            "profile": self.profile,
+            "source": self.source.value,
+            "channel_target": {"channel": ct.channel, "conversation_id": ct.conversation_id} if ct else None,
+            "approval_mode_override": self.approval_mode_override.value if self.approval_mode_override else None,
+            "allowed_tools_override": self.allowed_tools_override,
+            "max_turns": self.max_turns,
+            "max_budget_usd": self.max_budget_usd,
+            "model": self.model,
+            "resume_session_id": self.resume_session_id,
+            "sender_id": self.sender_id,
+            "status": self.status.value,
+            "created_at": self.created_at,
+        }
+
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> "Task":
+        ct = d.get("channel_target")
+        return cls(
+            prompt=d.get("prompt"),
+            command_ref=d.get("command_ref"),
+            command_args=d.get("command_args") or {},
+            profile=d.get("profile", "default"),
+            source=TaskSource(d.get("source", "cli")),
+            channel_target=ChannelTarget(**ct) if ct else None,
+            approval_mode_override=ApprovalMode(d["approval_mode_override"]) if d.get("approval_mode_override") else None,
+            allowed_tools_override=d.get("allowed_tools_override"),
+            max_turns=d.get("max_turns"),
+            max_budget_usd=d.get("max_budget_usd"),
+            model=d.get("model"),
+            resume_session_id=d.get("resume_session_id"),
+            sender_id=d.get("sender_id"),
+            id=d.get("id") or new_id("task"),
+            status=TaskStatus(d.get("status", "queued")),
+            created_at=d.get("created_at") or now(),
+        )
+
 
 @dataclass
 class RunResult:

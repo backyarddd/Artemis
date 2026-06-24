@@ -178,6 +178,40 @@ class Engine:
         return result
 
 
+    async def quick(self, system: str, prompt: str,
+                    model: str = "claude-haiku-4-5-20251001") -> str:
+        """One-shot, tool-free helper run in the isolated profile (no approval,
+        no streaming). Used for cheap auxiliary calls like memory extraction."""
+        from claude_agent_sdk import (AssistantMessage, ClaudeAgentOptions,
+                                      ResultMessage, TextBlock, query)
+
+        opts = ClaudeAgentOptions(
+            model=model,
+            cwd=str(self.profile.workspace),
+            env={"CLAUDE_CONFIG_DIR": str(self.profile.claude_home)},
+            settings=str(self.profile.settings_json),
+            setting_sources=DEFAULT_SETTING_SOURCES,
+            mcp_servers={}, strict_mcp_config=True,
+            system_prompt=system, permission_mode="default",
+            allowed_tools=[], disallowed_tools=["Bash", "Write", "Edit",
+                                                "WebFetch", "WebSearch", "Task", "Agent"],
+            max_turns=1,
+        )
+        out: list[str] = []
+        try:
+            async for msg in query(prompt=prompt, options=opts):
+                if isinstance(msg, AssistantMessage):
+                    for b in msg.content:
+                        if isinstance(b, TextBlock):
+                            out.append(b.text)
+                elif isinstance(msg, ResultMessage):
+                    if msg.total_cost_usd:
+                        self.cost.add("quick", msg.total_cost_usd)
+        except Exception:
+            self.log.debug("quick() failed", exc_info=True)
+        return "".join(out).strip()
+
+
 def _tool_summary(name: str, tool_input: dict) -> str:
     if name == "Bash":
         return f"$ {str(tool_input.get('command',''))[:80]}"
